@@ -21,18 +21,6 @@ var (
 	ErrNoOpenCommand = errors.New("Unsure what command to use to open this file")
 )
 
-// GitFile : A staged/unstaged file
-// TODO: decide whether to give all of these the Git prefix
-type GitFile struct {
-	Name               string
-	HasStagedChanges   bool
-	HasUnstagedChanges bool
-	Tracked            bool
-	Deleted            bool
-	HasMergeConflicts  bool
-	DisplayString      string
-}
-
 // Commit : A git commit
 type Commit struct {
 	Sha           string
@@ -77,19 +65,19 @@ func includesInt(list []int, a int) bool {
 	return false
 }
 
-func mergeGitStatusFiles(oldGitFiles, newGitFiles []GitFile) []GitFile {
-	if len(oldGitFiles) == 0 {
-		return newGitFiles
+func mergeGitStatusFiles(oldFiles, newFiles []File) []File {
+	if len(oldFiles) == 0 {
+		return newFiles
 	}
 
 	appendedIndexes := make([]int, 0)
 
 	// retain position of files we already could see
-	result := make([]GitFile, 0)
-	for _, oldGitFile := range oldGitFiles {
-		for newIndex, newGitFile := range newGitFiles {
-			if oldGitFile.Name == newGitFile.Name {
-				result = append(result, newGitFile)
+	result := make([]File, 0)
+	for _, oldFile := range oldFiles {
+		for newIndex, newFile := range newFiles {
+			if oldFile.Name == newFile.Name {
+				result = append(result, newFile)
 				appendedIndexes = append(appendedIndexes, newIndex)
 				break
 			}
@@ -97,9 +85,9 @@ func mergeGitStatusFiles(oldGitFiles, newGitFiles []GitFile) []GitFile {
 	}
 
 	// append any new files to the end
-	for index, newGitFile := range newGitFiles {
+	for index, newFile := range newFiles {
 		if !includesInt(appendedIndexes, index) {
-			result = append(result, newGitFile)
+			result = append(result, newFile)
 		}
 	}
 
@@ -162,10 +150,10 @@ func includes(array []string, str string) bool {
 	return false
 }
 
-func getGitStatusFiles() []GitFile {
+func getGitStatusFiles() []File {
 	statusOutput, _ := getGitStatus()
 	statusStrings := splitLines(statusOutput)
-	gitFiles := make([]GitFile, 0)
+	Files := make([]File, 0)
 
 	for _, statusString := range statusStrings {
 		change := statusString[0:2]
@@ -173,7 +161,7 @@ func getGitStatusFiles() []GitFile {
 		unstagedChange := statusString[1:2]
 		filename := statusString[3:]
 		tracked := !includes([]string{"??", "A "}, change)
-		gitFile := GitFile{
+		File := File{
 			Name:               filename,
 			DisplayString:      statusString,
 			HasStagedChanges:   !includes([]string{" ", "U", "?"}, stagedChange),
@@ -182,10 +170,10 @@ func getGitStatusFiles() []GitFile {
 			Deleted:            unstagedChange == "D" || stagedChange == "D",
 			HasMergeConflicts:  change == "UU",
 		}
-		gitFiles = append(gitFiles, gitFile)
+		Files = append(Files, File)
 	}
-	objectLog(gitFiles)
-	return gitFiles
+	objectLog(Files)
+	return Files
 }
 
 func gitStashDo(index int, method string) (string, error) {
@@ -350,7 +338,7 @@ func gitShow(sha string) string {
 	return result
 }
 
-func getDiff(file GitFile) string {
+func getDiff(file File) string {
 	cachedArg := ""
 	if file.HasStagedChanges && !file.HasUnstagedChanges {
 		cachedArg = "--cached "
@@ -401,7 +389,7 @@ func isInMergeState() (bool, error) {
 	return strings.Contains(output, "conclude merge") || strings.Contains(output, "unmerged paths"), nil
 }
 
-func removeFile(file GitFile) error {
+func removeFile(file File) error {
 	// if the file isn't tracked, we assume you want to delete it
 	if !file.Tracked {
 		_, err := runCommand("rm -rf ./" + file.Name)

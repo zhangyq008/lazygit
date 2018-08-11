@@ -109,7 +109,7 @@ func handleCommitSquashDown(g *gocui.Gui, v *gocui.View) error {
 }
 
 // TODO: move to files panel
-func anyUnStagedChanges(files []GitFile) bool {
+func anyUnStagedChanges(files []File) bool {
 	for _, file := range files {
 		if file.Tracked && file.HasUnstagedChanges {
 			return true
@@ -122,8 +122,8 @@ func handleCommitFixup(g *gocui.Gui, v *gocui.View) error {
 	if len(state.Commits) == 1 {
 		return createErrorPanel(g, "You have no commits to squash with")
 	}
-	objectLog(state.GitFiles)
-	if anyUnStagedChanges(state.GitFiles) {
+	objectLog(state.Files)
+	if anyUnStagedChanges(state.Files) {
 		return createErrorPanel(g, "Can't fixup while there are unstaged changes")
 	}
 	branch := state.Branches[0]

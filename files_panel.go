@@ -8,9 +8,9 @@ import (
 	// "strings"
 
 	"errors"
+	"fmt"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/jesseduffield/gocui"
 )
 
@@ -19,8 +19,8 @@ var (
 	errNoUsername = errors.New(`No username set. Please do: git config --global user.name "Your Name"`)
 )
 
-func stagedFiles(files []GitFile) []GitFile {
-	result := make([]GitFile, 0)
+func stagedFiles(files []File) []File {
+	result := make([]File, 0)
 	for _, file := range files {
 		if file.HasStagedChanges {
 			result = append(result, file)
@@ -81,16 +81,16 @@ func handleAddPatch(g *gocui.Gui, v *gocui.View) error {
 	return err
 }
 
-func getSelectedFile(g *gocui.Gui) (GitFile, error) {
-	if len(state.GitFiles) == 0 {
-		return GitFile{}, errNoFiles
+func getSelectedFile(g *gocui.Gui) (File, error) {
+	if len(state.Files) == 0 {
+		return File{}, errNoFiles
 	}
 	filesView, err := g.View("files")
 	if err != nil {
 		panic(err)
 	}
 	lineNumber := getItemPosition(filesView)
-	return state.GitFiles[lineNumber], nil
+	return state.Files[lineNumber], nil
 }
 
 func handleFileRemove(g *gocui.Gui, v *gocui.View) error {
@@ -127,7 +127,7 @@ func handleIgnoreFile(g *gocui.Gui, v *gocui.View) error {
 	return refreshFiles(g)
 }
 
-func renderfilesOptions(g *gocui.Gui, gitFile *GitFile) error {
+func renderfilesOptions(g *gocui.Gui, File *File) error {
 	optionsMap := map[string]string{
 		"← → ↑ ↓":   "navigate",
 		"S":         "stash files",
@@ -145,17 +145,17 @@ func renderfilesOptions(g *gocui.Gui, gitFile *GitFile) error {
 		optionsMap["a"] = "abort merge"
 		optionsMap["m"] = "resolve merge conflicts"
 	}
-	if gitFile == nil {
+	if File == nil {
 		return renderOptionsMap(g, optionsMap)
 	}
-	if gitFile.Tracked {
+	if File.Tracked {
 		optionsMap["d"] = "checkout"
 	}
 	return renderOptionsMap(g, optionsMap)
 }
 
 func handleFileSelect(g *gocui.Gui, v *gocui.View) error {
-	gitFile, err := getSelectedFile(g)
+	File, err := getSelectedFile(g)
 	if err != nil {
 		if err != errNoFiles {
 			return err
@@ -163,18 +163,18 @@ func handleFileSelect(g *gocui.Gui, v *gocui.View) error {
 		renderString(g, "main", "No changed files")
 		return renderfilesOptions(g, nil)
 	}
-	renderfilesOptions(g, &gitFile)
+	renderfilesOptions(g, &File)
 	var content string
-	if gitFile.HasMergeConflicts {
+	if File.HasMergeConflicts {
 		return refreshMergePanel(g)
 	}
 
-	content = getDiff(gitFile)
+	content = getDiff(File)
 	return renderString(g, "main", content)
 }
 
 func handleCommitPress(g *gocui.Gui, filesView *gocui.View) error {
-	if len(stagedFiles(state.GitFiles)) == 0 && !state.HasMergeConflicts {
+	if len(stagedFiles(state.Files)) == 0 && !state.HasMergeConflicts {
 		return createErrorPanel(g, "There are no staged files to commit")
 	}
 	commitMessageView := getCommitMessageView(g)
@@ -187,7 +187,7 @@ func handleCommitPress(g *gocui.Gui, filesView *gocui.View) error {
 }
 
 func handleCommitEditorPress(g *gocui.Gui, filesView *gocui.View) error {
-	if len(stagedFiles(state.GitFiles)) == 0 && !state.HasMergeConflicts {
+	if len(stagedFiles(state.Files)) == 0 && !state.HasMergeConflicts {
 		return createErrorPanel(g, "There are no staged files to commit")
 	}
 	runSubProcess(g, "git", "commit")
@@ -228,10 +228,10 @@ func handleRefreshFiles(g *gocui.Gui, v *gocui.View) error {
 	return refreshFiles(g)
 }
 
-func refreshStateGitFiles() {
+func refreshStateFiles() {
 	// get files to stage
-	gitFiles := getGitStatusFiles()
-	state.GitFiles = mergeGitStatusFiles(state.GitFiles, gitFiles)
+	Files := getGitStatusFiles()
+	state.Files = mergeGitStatusFiles(state.Files, Files)
 	updateHasMergeConflictStatus()
 }
 
@@ -242,24 +242,6 @@ func updateHasMergeConflictStatus() error {
 	}
 	state.HasMergeConflicts = merging
 	return nil
-}
-
-func renderGitFile(gitFile GitFile, filesView *gocui.View) {
-	// potentially inefficient to be instantiating these color
-	// objects with each render
-	red := color.New(color.FgRed)
-	green := color.New(color.FgGreen)
-	if !gitFile.Tracked && !gitFile.HasStagedChanges {
-		red.Fprintln(filesView, gitFile.DisplayString)
-		return
-	}
-	green.Fprint(filesView, gitFile.DisplayString[0:1])
-	red.Fprint(filesView, gitFile.DisplayString[1:3])
-	if gitFile.HasUnstagedChanges {
-		red.Fprintln(filesView, gitFile.Name)
-	} else {
-		green.Fprintln(filesView, gitFile.Name)
-	}
 }
 
 func catSelectedFile(g *gocui.Gui) (string, error) {
@@ -282,10 +264,10 @@ func refreshFiles(g *gocui.Gui) error {
 	if err != nil {
 		return err
 	}
-	refreshStateGitFiles()
+	refreshStateFiles()
 	filesView.Clear()
-	for _, gitFile := range state.GitFiles {
-		renderGitFile(gitFile, filesView)
+	for _, File := range state.Files {
+		fmt.Fprintln(filesView, File.getDisplayString())
 	}
 	correctCursor(filesView)
 	if filesView == g.CurrentView() {

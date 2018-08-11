@@ -97,11 +97,11 @@ func isIndexToDelete(i int, conflict conflict, pick string) bool {
 }
 
 func resolveConflict(g *gocui.Gui, conflict conflict, pick string) error {
-	gitFile, err := getSelectedFile(g)
+	File, err := getSelectedFile(g)
 	if err != nil {
 		return err
 	}
-	file, err := os.Open(gitFile.Name)
+	file, err := os.Open(File.Name)
 	if err != nil {
 		return err
 	}
@@ -119,15 +119,15 @@ func resolveConflict(g *gocui.Gui, conflict conflict, pick string) error {
 		}
 	}
 	devLog(output)
-	return ioutil.WriteFile(gitFile.Name, []byte(output), 0644)
+	return ioutil.WriteFile(File.Name, []byte(output), 0644)
 }
 
 func pushFileSnapshot(g *gocui.Gui) error {
-	gitFile, err := getSelectedFile(g)
+	File, err := getSelectedFile(g)
 	if err != nil {
 		return err
 	}
-	content, err := catFile(gitFile.Name)
+	content, err := catFile(File.Name)
 	if err != nil {
 		return err
 	}
@@ -140,11 +140,11 @@ func handlePopFileSnapshot(g *gocui.Gui, v *gocui.View) error {
 		return nil
 	}
 	prevContent := state.EditHistory.Pop().(string)
-	gitFile, err := getSelectedFile(g)
+	File, err := getSelectedFile(g)
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(gitFile.Name, []byte(prevContent), 0644)
+	ioutil.WriteFile(File.Name, []byte(prevContent), 0644)
 	return refreshMergePanel(g)
 }
 

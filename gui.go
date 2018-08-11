@@ -19,7 +19,7 @@ import (
 var OverlappingEdges = false
 
 type stateType struct {
-	GitFiles          []GitFile
+	Files             []File
 	Branches          []Branch
 	Commits           []Commit
 	StashEntries      []StashEntry
@@ -39,7 +39,7 @@ type conflict struct {
 }
 
 var state = stateType{
-	GitFiles:      make([]GitFile, 0),
+	Files:         make([]File, 0),
 	PreviousView:  "files",
 	Commits:       make([]Commit, 0),
 	StashEntries:  make([]StashEntry, 0),

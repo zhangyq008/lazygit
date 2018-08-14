@@ -270,8 +270,12 @@ func (c *GitCommand) Commit(g *gocui.Gui, message string) (*exec.Cmd, error) {
 		return c.OSCommand.PrepareSubProcess(c.OSCommand.Platform.shell, c.OSCommand.Platform.shellArg, command)
 	}
 	// TODO: make these runDirectCommand functions just return an error
-	_, err := c.OSCommand.RunDirectCommand(command)
-	return nil, err
+	// _, err := c.OSCommand.RunDirectCommand(command)
+	output, err := exec.Command("git", "commit", "-m", message).CombinedOutput()
+	if err != nil {
+		return nil, errors.New(fmt.Sprint(output))
+	}
+	return nil, nil
 }
 
 // Pull pull from repo

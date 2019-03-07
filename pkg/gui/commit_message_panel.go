@@ -1,42 +1,56 @@
 package gui
 
 import (
+	"os/exec"
 	"strconv"
 	"strings"
 
 	"github.com/jesseduffield/gocui"
 )
 
-func (gui *Gui) handleCommitConfirm(g *gocui.Gui, v *gocui.View) error {
-	message := gui.trimmedContent(v)
-	if message == "" {
-		return gui.createErrorPanel(g, gui.Tr.SLocalize("CommitWithoutMessageErr"))
-	}
-	sub, err := gui.GitCommand.Commit(message)
+// runSyncOrAsyncCommand takes the output of a command that may have returned
+// either no error, an error, or a subprocess to execute, and if a subprocess
+// needs to be set on the gui object, it does so, and then returns the error
+func (gui *Gui) runSyncOrAsyncCommand(sub *exec.Cmd, err error) error {
 	if err != nil {
-		// TODO need to find a way to send through this error
 		if err != gui.Errors.ErrSubProcess {
-			return gui.createErrorPanel(g, err.Error())
+			return gui.createErrorPanel(gui.g, err.Error())
 		}
 	}
 	if sub != nil {
 		gui.SubProcess = sub
 		return gui.Errors.ErrSubProcess
 	}
-	gui.refreshFiles(g)
+	return nil
+}
+
+func (gui *Gui) handleCommitConfirm(g *gocui.Gui, v *gocui.View) error {
+	message := gui.trimmedContent(v)
+	if message == "" {
+		return gui.createErrorPanel(g, gui.Tr.SLocalize("CommitWithoutMessageErr"))
+	}
+	if err := gui.runSyncOrAsyncCommand(gui.GitCommand.Commit(message)); err != nil {
+		return err
+	}
+
 	v.Clear()
-	v.SetCursor(0, 0)
-	g.SetViewOnBottom("commitMessage")
-	gui.switchFocus(g, v, gui.getFilesView(g))
-	return gui.refreshCommits(g)
+	_ = v.SetCursor(0, 0)
+	_ = v.SetOrigin(0, 0)
+	_, _ = g.SetViewOnBottom("commitMessage")
+	_ = gui.switchFocus(g, v, gui.getFilesView())
+	return gui.refreshSidePanels(g)
 }
 
 func (gui *Gui) handleCommitClose(g *gocui.Gui, v *gocui.View) error {
 	g.SetViewOnBottom("commitMessage")
-	return gui.switchFocus(g, v, gui.getFilesView(g))
+	return gui.switchFocus(g, v, gui.getFilesView())
 }
 
 func (gui *Gui) handleCommitFocused(g *gocui.Gui, v *gocui.View) error {
+	if _, err := g.SetViewOnTop("commitMessage"); err != nil {
+		return err
+	}
+
 	message := gui.Tr.TemplateLocalize(
 		"CloseConfirm",
 		Teml{
@@ -78,10 +92,11 @@ func (gui *Gui) getBufferLength(view *gocui.View) string {
 	return " " + strconv.Itoa(strings.Count(view.Buffer(), "")-1) + " "
 }
 
+// RenderCommitLength is a function.
 func (gui *Gui) RenderCommitLength() {
 	if !gui.Config.GetUserConfig().GetBool("gui.commitLength.show") {
 		return
 	}
-	v := gui.getCommitMessageView(gui.g)
+	v := gui.getCommitMessageView()
 	v.Subtitle = gui.getBufferLength(v)
 }

@@ -6,6 +6,7 @@
   gui:
     # stuff relating to the UI
     scrollHeight: 2 # how many lines you scroll by
+    scrollPastBottom: true # enable scrolling past the bottom
     theme:
       activeBorderColor:
         - white
@@ -16,6 +17,10 @@
         - blue
     commitLength:
       show: true
+  git:
+    merging:
+      # only applicable to unix users
+      manualCommit: false
   update:
     method: prompt # can be: prompt | background | never
     days: 14 # how often an update is checked for

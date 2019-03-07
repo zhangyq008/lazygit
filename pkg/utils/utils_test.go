@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
+// TestSplitLines is a function.
 func TestSplitLines(t *testing.T) {
 	type scenario struct {
 		multilineString string
@@ -36,6 +36,7 @@ func TestSplitLines(t *testing.T) {
 	}
 }
 
+// TestWithPadding is a function.
 func TestWithPadding(t *testing.T) {
 	type scenario struct {
 		str      string
@@ -61,6 +62,7 @@ func TestWithPadding(t *testing.T) {
 	}
 }
 
+// TestTrimTrailingNewline is a function.
 func TestTrimTrailingNewline(t *testing.T) {
 	type scenario struct {
 		str      string
@@ -83,6 +85,7 @@ func TestTrimTrailingNewline(t *testing.T) {
 	}
 }
 
+// TestNormalizeLinefeeds is a function.
 func TestNormalizeLinefeeds(t *testing.T) {
 	type scenario struct {
 		byteArray []byte
@@ -116,6 +119,7 @@ func TestNormalizeLinefeeds(t *testing.T) {
 	}
 }
 
+// TestResolvePlaceholderString is a function.
 func TestResolvePlaceholderString(t *testing.T) {
 	type scenario struct {
 		templateString string
@@ -169,6 +173,7 @@ func TestResolvePlaceholderString(t *testing.T) {
 	}
 }
 
+// TestDisplayArraysAligned is a function.
 func TestDisplayArraysAligned(t *testing.T) {
 	type scenario struct {
 		input    [][]string
@@ -197,14 +202,20 @@ type myDisplayable struct {
 
 type myStruct struct{}
 
-func (d *myDisplayable) GetDisplayStrings() []string {
+// GetDisplayStrings is a function.
+func (d *myDisplayable) GetDisplayStrings(isFocused bool) []string {
+	if isFocused {
+		return append(d.strings, "blah")
+	}
 	return d.strings
 }
 
+// TestGetDisplayStringArrays is a function.
 func TestGetDisplayStringArrays(t *testing.T) {
 	type scenario struct {
-		input    []Displayable
-		expected [][]string
+		input     []Displayable
+		isFocused bool
+		expected  [][]string
 	}
 
 	scenarios := []scenario{
@@ -213,20 +224,31 @@ func TestGetDisplayStringArrays(t *testing.T) {
 				Displayable(&myDisplayable{[]string{"a", "b"}}),
 				Displayable(&myDisplayable{[]string{"c", "d"}}),
 			},
+			false,
 			[][]string{{"a", "b"}, {"c", "d"}},
+		},
+		{
+			[]Displayable{
+				Displayable(&myDisplayable{[]string{"a", "b"}}),
+				Displayable(&myDisplayable{[]string{"c", "d"}}),
+			},
+			true,
+			[][]string{{"a", "b", "blah"}, {"c", "d", "blah"}},
 		},
 	}
 
 	for _, s := range scenarios {
-		assert.EqualValues(t, s.expected, getDisplayStringArrays(s.input))
+		assert.EqualValues(t, s.expected, getDisplayStringArrays(s.input, s.isFocused))
 	}
 }
 
+// TestRenderDisplayableList is a function.
 func TestRenderDisplayableList(t *testing.T) {
 	type scenario struct {
-		input          []Displayable
-		expectedString string
-		expectedError  error
+		input                []Displayable
+		isFocused            bool
+		expectedString       string
+		expectedErrorMessage string
 	}
 
 	scenarios := []scenario{
@@ -235,39 +257,57 @@ func TestRenderDisplayableList(t *testing.T) {
 				Displayable(&myDisplayable{[]string{}}),
 				Displayable(&myDisplayable{[]string{}}),
 			},
+			false,
 			"\n",
-			nil,
+			"",
 		},
 		{
 			[]Displayable{
 				Displayable(&myDisplayable{[]string{"aa", "b"}}),
 				Displayable(&myDisplayable{[]string{"c", "d"}}),
 			},
+			false,
 			"aa b\nc  d",
-			nil,
+			"",
 		},
 		{
 			[]Displayable{
 				Displayable(&myDisplayable{[]string{"a"}}),
 				Displayable(&myDisplayable{[]string{"b", "c"}}),
 			},
+			false,
 			"",
-			errors.New("Each item must return the same number of strings to display"),
+			"Each item must return the same number of strings to display",
+		},
+		{
+			[]Displayable{
+				Displayable(&myDisplayable{[]string{"a"}}),
+				Displayable(&myDisplayable{[]string{"b"}}),
+			},
+			true,
+			"a blah\nb blah",
+			"",
 		},
 	}
 
 	for _, s := range scenarios {
-		str, err := renderDisplayableList(s.input)
+		str, err := renderDisplayableList(s.input, s.isFocused)
 		assert.EqualValues(t, s.expectedString, str)
-		assert.EqualValues(t, s.expectedError, err)
+		if s.expectedErrorMessage != "" {
+			assert.EqualError(t, err, s.expectedErrorMessage)
+		} else {
+			assert.NoError(t, err)
+		}
 	}
 }
 
+// TestRenderList is a function.
 func TestRenderList(t *testing.T) {
 	type scenario struct {
-		input          interface{}
-		expectedString string
-		expectedError  error
+		input                interface{}
+		isFocused            bool
+		expectedString       string
+		expectedErrorMessage string
 	}
 
 	scenarios := []scenario{
@@ -276,31 +316,47 @@ func TestRenderList(t *testing.T) {
 				{[]string{"aa", "b"}},
 				{[]string{"c", "d"}},
 			},
+			false,
 			"aa b\nc  d",
-			nil,
+			"",
 		},
 		{
 			[]*myStruct{
 				{},
 				{},
 			},
+			false,
 			"",
-			errors.New("item does not implement the Displayable interface"),
+			"item does not implement the Displayable interface",
 		},
 		{
 			&myStruct{},
+			false,
 			"",
-			errors.New("RenderList given a non-slice type"),
+			"RenderList given a non-slice type",
+		},
+		{
+			[]*myDisplayable{
+				{[]string{"a"}},
+			},
+			true,
+			"a blah",
+			"",
 		},
 	}
 
 	for _, s := range scenarios {
-		str, err := RenderList(s.input)
+		str, err := RenderList(s.input, s.isFocused)
 		assert.EqualValues(t, s.expectedString, str)
-		assert.EqualValues(t, s.expectedError, err)
+		if s.expectedErrorMessage != "" {
+			assert.EqualError(t, err, s.expectedErrorMessage)
+		} else {
+			assert.NoError(t, err)
+		}
 	}
 }
 
+// TestGetPaddedDisplayStrings is a function.
 func TestGetPaddedDisplayStrings(t *testing.T) {
 	type scenario struct {
 		stringArrays [][]string
@@ -321,6 +377,7 @@ func TestGetPaddedDisplayStrings(t *testing.T) {
 	}
 }
 
+// TestGetPadWidths is a function.
 func TestGetPadWidths(t *testing.T) {
 	type scenario struct {
 		stringArrays [][]string
@@ -347,6 +404,7 @@ func TestGetPadWidths(t *testing.T) {
 	}
 }
 
+// TestMin is a function.
 func TestMin(t *testing.T) {
 	type scenario struct {
 		a        int
@@ -375,4 +433,143 @@ func TestMin(t *testing.T) {
 	for _, s := range scenarios {
 		assert.EqualValues(t, s.expected, Min(s.a, s.b))
 	}
+}
+
+// TestIncludesString is a function.
+func TestIncludesString(t *testing.T) {
+	type scenario struct {
+		list     []string
+		element  string
+		expected bool
+	}
+
+	scenarios := []scenario{
+		{
+			[]string{"a", "b"},
+			"a",
+			true,
+		},
+		{
+			[]string{"a", "b"},
+			"c",
+			false,
+		},
+		{
+			[]string{"a", "b"},
+			"",
+			false,
+		},
+		{
+			[]string{""},
+			"",
+			true,
+		},
+	}
+
+	for _, s := range scenarios {
+		assert.EqualValues(t, s.expected, IncludesString(s.list, s.element))
+	}
+}
+
+func TestNextIndex(t *testing.T) {
+	type scenario struct {
+		testName string
+		list     []int
+		element  int
+		expected int
+	}
+
+	scenarios := []scenario{
+		{
+			// I'm not really fussed about how it behaves here
+			"no elements",
+			[]int{},
+			1,
+			0,
+		},
+		{
+			"one element",
+			[]int{1},
+			1,
+			0,
+		},
+		{
+			"two elements",
+			[]int{1, 2},
+			1,
+			1,
+		},
+		{
+			"two elements, giving second one",
+			[]int{1, 2},
+			2,
+			0,
+		},
+		{
+			"three elements, giving second one",
+			[]int{1, 2, 3},
+			2,
+			2,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.testName, func(t *testing.T) {
+			assert.EqualValues(t, s.expected, NextIndex(s.list, s.element))
+		})
+	}
+}
+
+func TestPrevIndex(t *testing.T) {
+	type scenario struct {
+		testName string
+		list     []int
+		element  int
+		expected int
+	}
+
+	scenarios := []scenario{
+		{
+			// I'm not really fussed about how it behaves here
+			"no elements",
+			[]int{},
+			1,
+			-1,
+		},
+		{
+			"one element",
+			[]int{1},
+			1,
+			0,
+		},
+		{
+			"two elements",
+			[]int{1, 2},
+			1,
+			1,
+		},
+		{
+			"three elements, giving second one",
+			[]int{1, 2, 3},
+			2,
+			0,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.testName, func(t *testing.T) {
+			assert.EqualValues(t, s.expected, PrevIndex(s.list, s.element))
+		})
+	}
+}
+
+func TestAsJson(t *testing.T) {
+	type myStruct struct {
+		a string
+	}
+
+	output := AsJson(&myStruct{a: "foo"})
+
+	// no idea why this is returning empty hashes but it's works in the app ¯\_(ツ)_/¯
+	assert.EqualValues(t, "{}", output)
 }

@@ -6,9 +6,11 @@ package gocui
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"strings"
+	"time"
+
+	"github.com/go-errors/errors"
 
 	"github.com/jesseduffield/termbox-go"
 	"github.com/mattn/go-runewidth"
@@ -86,6 +88,9 @@ type View struct {
 
 	// Overlaps describes which edges are overlapping with another view's edges
 	Overlaps byte
+
+	// If HasLoader is true, the message will be appended with a spinning loader animation
+	HasLoader bool
 }
 
 type viewLine struct {
@@ -148,7 +153,6 @@ func (v *View) setRune(x, y int, ch rune, fgColor, bgColor Attribute) error {
 	if x < 0 || x >= maxX || y < 0 || y >= maxY {
 		return errors.New("invalid point")
 	}
-
 	var (
 		ry, rcy int
 		err     error
@@ -270,12 +274,19 @@ func (v *View) parseInput(ch rune) []cell {
 		if isEscape {
 			return nil
 		}
-		c := cell{
-			fgColor: v.ei.curFgColor,
-			bgColor: v.ei.curBgColor,
-			chr:     ch,
+		repeatCount := 1
+		if ch == '\t' {
+			ch = ' '
+			repeatCount = 4
 		}
-		cells = append(cells, c)
+		for i := 0; i < repeatCount; i++ {
+			c := cell{
+				fgColor: v.ei.curFgColor,
+				bgColor: v.ei.curBgColor,
+				chr:     ch,
+			}
+			cells = append(cells, c)
+		}
 	}
 
 	return cells
@@ -315,7 +326,11 @@ func (v *View) draw() error {
 	}
 	if v.tainted {
 		v.viewLines = nil
-		for i, line := range v.lines {
+		lines := v.lines
+		if v.HasLoader {
+			lines = v.loaderLines()
+		}
+		for i, line := range lines {
 			wrap := 0
 			if v.Wrap {
 				wrap = maxX
@@ -327,7 +342,9 @@ func (v *View) draw() error {
 				v.viewLines = append(v.viewLines, vline)
 			}
 		}
-		v.tainted = false
+		if !v.HasLoader {
+			v.tainted = false
+		}
 	}
 
 	if v.Autoscroll && len(v.viewLines) > maxY {
@@ -447,8 +464,8 @@ func (v *View) ViewBufferLines() []string {
 	return lines
 }
 
-func (v *View) ViewLinesHeight() int {
-	return len(v.viewLines)
+func (v *View) LinesHeight() int {
+	return len(v.lines)
 }
 
 // ViewBuffer returns a string with the contents of the view's buffer that is
@@ -533,7 +550,7 @@ func lineWrap(line []cell, columns int) [][]cell {
 		n += rw
 		if n > columns {
 			n = rw
-			lines = append(lines, line[offset:i-1])
+			lines = append(lines, line[offset:i])
 			offset = i
 		}
 	}
@@ -556,4 +573,33 @@ func linesToString(lines [][]cell) string {
 	}
 
 	return strings.Join(str, "\n")
+}
+
+func (v *View) loaderLines() [][]cell {
+	duplicate := make([][]cell, len(v.lines))
+	for i := range v.lines {
+		if i < len(v.lines)-1 {
+			duplicate[i] = make([]cell, len(v.lines[i]))
+			copy(duplicate[i], v.lines[i])
+		} else {
+			duplicate[i] = make([]cell, len(v.lines[i])+2)
+			copy(duplicate[i], v.lines[i])
+			duplicate[i][len(duplicate[i])-2] = cell{chr: ' '}
+			duplicate[i][len(duplicate[i])-1] = Loader()
+		}
+	}
+
+	return duplicate
+}
+
+func Loader() cell {
+	characters := "|/-\\"
+	now := time.Now()
+	nanos := now.UnixNano()
+	index := nanos / 50000000 % int64(len(characters))
+	str := characters[index : index+1]
+	chr := []rune(str)[0]
+	return cell{
+		chr: chr,
+	}
 }
